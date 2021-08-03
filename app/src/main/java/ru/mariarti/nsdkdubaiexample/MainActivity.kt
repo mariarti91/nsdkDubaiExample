@@ -33,7 +33,7 @@ class MainActivity : AppCompatActivity() {
             val uaeTerritory = territories.find { it.info.name == "UAE" }
             check(uaeTerritory != null) { "UAE territory not found!" }
 
-            if (uaeTerritory.info.compatible.not()) {
+            if (!uaeTerritory.info.compatible) {
 
                 val progressText = findViewById<TextView>(R.id.progressTv)!!
                 findViewById<ProgressBar>(R.id.progressBar).apply {
@@ -51,7 +51,8 @@ class MainActivity : AppCompatActivity() {
                                 {
                                     visibility = GONE
                                     progressText.visibility = GONE
-                                }, 2000 )
+                                }, 2000
+                            )
                         }
                     })
                 }
@@ -78,15 +79,17 @@ class MainActivity : AppCompatActivity() {
         closeables.forEach(AutoCloseable::close)
     }
 
-    private fun initializeDGis() : Context
-    {
-        val key = { id: Int -> String
+    private fun initializeDGis(): Context {
+        val key = { id: Int ->
+            String
             applicationContext.resources.getString(id)
         }
 
-        return DGis.initialize(applicationContext, ApiKeys(
-            directory = key(R.string.dgis_directory_api_key),
-            map = key(R.string.dgis_map_api_key)
-        ))
+        return DGis.initialize(
+            applicationContext, ApiKeys(
+                directory = key(R.string.dgis_directory_api_key),
+                map = key(R.string.dgis_map_api_key)
+            )
+        )
     }
 }
