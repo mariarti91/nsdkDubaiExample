@@ -3,6 +3,11 @@ package ru.mariarti.nsdkdubaiexample
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.view.View.GONE
+import android.view.View.VISIBLE
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import ru.dgis.sdk.ApiKeys
 import ru.dgis.sdk.Context
 import ru.dgis.sdk.DGis
@@ -12,11 +17,11 @@ import ru.dgis.sdk.update.*
 
 class MainActivity : AppCompatActivity() {
 
+    private val closeables = mutableListOf<AutoCloseable>()
+
     private val dgisContext by lazy { initializeDGis() }
     private val updateManager by lazy { getPackageManager(dgisContext) }
     private val territoryManager by lazy { getTerritoryManager(dgisContext) }
-
-    private lateinit var territoriesConnection: AutoCloseable
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,17 +29,35 @@ class MainActivity : AppCompatActivity() {
 
         updateManager.checkForUpdates()
 
-        territoriesConnection = territoryManager.territoriesChannel.connect { territories ->
+        closeables.add(territoryManager.territoriesChannel.connect { territories ->
             val uaeTerritory = territories.find { it.info.name == "UAE" }
             check(uaeTerritory != null) { "UAE territory not found!" }
 
             if (uaeTerritory.info.compatible.not()) {
-                uaeTerritory.progressChannel.connect {
-                    Log.d("UAE_DOWNLOAD", "progress: $it")
+
+                val progressText = findViewById<TextView>(R.id.progressTv)!!
+                findViewById<ProgressBar>(R.id.progressBar).apply {
+                    progressText.visibility = VISIBLE
+                    visibility = VISIBLE
+                    closeables.add(uaeTerritory.progressChannel.connect {
+                        progress = it.toInt()
+                        Log.d("UAE_DOWNLOAD", "progress: $it")
+
+                        progressText.text = "$it %"
+
+                        if (it.toInt() == 100) {
+                            Log.d("UAE_DOWNLOAD", "Downloaded")
+                            postDelayed(
+                                {
+                                    visibility = GONE
+                                    progressText.visibility = GONE
+                                }, 2000 )
+                        }
+                    })
                 }
                 uaeTerritory.install()
             }
-        }
+        })
 
         val mapOptions = MapOptions().apply {
             source = DgisSource.createOfflineDgisSource(dgisContext)
@@ -45,12 +68,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         val mapView = MapView(this, mapOptions)
-        setContentView(mapView)
+        findViewById<LinearLayout>(R.id.mapHolder).apply {
+            addView(mapView)
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        territoriesConnection.close()
+        closeables.forEach(AutoCloseable::close)
     }
 
     private fun initializeDGis() : Context
